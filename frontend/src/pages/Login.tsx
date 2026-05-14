@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, getApiErrorMessage } from '../lib/api'
 
 export default function Login() {
 	const navigate = useNavigate()
@@ -20,8 +20,8 @@ export default function Login() {
 			})
 			localStorage.setItem('token', res.data.access_token)
 			navigate('/timesheet')
-		} catch (e: any) {
-			setError(e?.response?.data?.detail ?? 'Ошибка входа')
+		} catch (e) {
+			setError(getApiErrorMessage(e, 'Ошибка входа'))
 		}
 	}
 
@@ -29,8 +29,8 @@ export default function Login() {
 		<div style={{ padding: 16, maxWidth: 420 }}>
 			<h2>Вход</h2>
 			<form onSubmit={onSubmit}>
-				<input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ display: 'block', marginBottom: 8, width: '100%' }} />
-				<input placeholder="Пароль" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ display: 'block', marginBottom: 8, width: '100%' }} />
+				<input placeholder="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={{ display: 'block', marginBottom: 8, width: '100%' }} />
+				<input placeholder="Пароль" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ display: 'block', marginBottom: 8, width: '100%' }} />
 				{error && <div style={{ color: 'red', marginBottom: 8 }}>{error}</div>}
 				<button type="submit">Войти</button>
 			</form>
