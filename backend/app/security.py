@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
+import os
 from typing import Optional
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 
-SECRET_KEY = "CHANGE_ME_SECRET"  # замените через переменные окружения
+SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8
 
