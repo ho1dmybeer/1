@@ -19,11 +19,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 	return password_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(subject: str, expires_delta: Optional[timedelta] = None, role: str = "user") -> str:
 	if expires_delta is None:
 		expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 	expire = datetime.now(tz=timezone.utc) + expires_delta
-	to_encode = {"exp": expire, "sub": str(subject)}
+	to_encode = {"exp": expire, "sub": str(subject), "role": role}
 	return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 

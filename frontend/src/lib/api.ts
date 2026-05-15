@@ -31,7 +31,8 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 api.interceptors.request.use((config) => {
-	const token = localStorage.getItem('token')
+	const isAdminRequest = config.url?.startsWith('/admin')
+	const token = localStorage.getItem(isAdminRequest ? 'adminToken' : 'token')
 	if (token) {
 		config.headers = config.headers ?? {}
 		config.headers.Authorization = `Bearer ${token}`

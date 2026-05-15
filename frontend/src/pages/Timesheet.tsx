@@ -1,46 +1,80 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, getApiErrorMessage } from '../lib/api'
 
-interface TimesheetEntry {
+interface WorkSession {
 	id: number
-	entry_date: string
-	hours: number
-	project?: string | null
+	user_id: number
+	user_name?: string | null
+	user_email?: string | null
+	project: string
+	started_at: string
+	lunch_started_at?: string | null
+	lunch_ended_at?: string | null
+	ended_at?: string | null
 	notes?: string | null
+	status: 'active' | 'paused' | 'completed'
+	total_seconds: number
 }
 
-function getTodayInputValue() {
-	const date = new Date()
-	const offset = date.getTimezoneOffset() * 60000
-	return new Date(date.getTime() - offset).toISOString().slice(0, 10)
+function parseApiDate(value: string) {
+	return new Date(value.endsWith('Z') ? value : `${value}Z`)
 }
 
-function formatDate(value: string) {
-	const [year, month, day] = value.split('-')
-	return `${day}.${month}.${year}`
+function formatDateTime(value?: string | null) {
+	if (!value) {
+		return '-'
+	}
+	return parseApiDate(value).toLocaleString()
+}
+
+function formatDuration(seconds: number) {
+	const safeSeconds = Math.max(0, Math.floor(seconds))
+	const hours = Math.floor(safeSeconds / 3600)
+	const minutes = Math.floor((safeSeconds % 3600) / 60)
+	const secs = safeSeconds % 60
+	return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
+
+function getLiveSeconds(session: WorkSession | null | undefined, now: Date) {
+	if (!session) {
+		return 0
+	}
+	if (session.ended_at) {
+		return session.total_seconds
+	}
+
+	const startedAt = parseApiDate(session.started_at)
+	let total = Math.max(0, Math.floor((now.getTime() - startedAt.getTime()) / 1000))
+
+	if (session.lunch_started_at) {
+		const lunchStartedAt = parseApiDate(session.lunch_started_at)
+		const lunchEndedAt = session.lunch_ended_at ? parseApiDate(session.lunch_ended_at) : now
+		total -= Math.max(0, Math.floor((lunchEndedAt.getTime() - lunchStartedAt.getTime()) / 1000))
+	}
+
+	return Math.max(0, total)
 }
 
 export default function Timesheet() {
 	const navigate = useNavigate()
 	const qc = useQueryClient()
-	const { data, isLoading, error } = useQuery<TimesheetEntry[]>({
-		queryKey: ['timesheet'],
-		queryFn: async () => (await api.get('/timesheet/')).data
-	})
-
-	const [entryDate, setEntryDate] = useState<string>(getTodayInputValue())
-	const [hours, setHours] = useState<string>('')
-	const [project, setProject] = useState<string>('')
-	const [notes, setNotes] = useState<string>('')
-	const [formError, setFormError] = useState<string | null>(null)
+	const [now, setNow] = useState(new Date())
+	const [project, setProject] = useState('')
+	const [notes, setNotes] = useState('')
+	const [error, setError] = useState<string | null>(null)
 	const [isSubmitting, setIsSubmitting] = useState(false)
 
-	const totalHours = useMemo(
-		() => data?.reduce((total, entry) => total + entry.hours, 0) ?? 0,
-		[data]
-	)
+	const currentQuery = useQuery<WorkSession | null>({
+		queryKey: ['work-session-current'],
+		queryFn: async () => (await api.get('/work-sessions/current')).data
+	})
+
+	const historyQuery = useQuery<WorkSession[]>({
+		queryKey: ['work-sessions-my'],
+		queryFn: async () => (await api.get('/work-sessions/my')).data
+	})
 
 	useEffect(() => {
 		if (!localStorage.getItem('token')) {
@@ -48,36 +82,59 @@ export default function Timesheet() {
 		}
 	}, [navigate])
 
-	async function onSubmit(e: FormEvent) {
-		e.preventDefault()
-		setFormError(null)
+	useEffect(() => {
+		const id = window.setInterval(() => setNow(new Date()), 1000)
+		return () => window.clearInterval(id)
+	}, [])
+
+	const current = currentQuery.data
+	const liveSeconds = useMemo(() => getLiveSeconds(current, now), [current, now])
+
+	async function refresh() {
+		await qc.invalidateQueries({ queryKey: ['work-session-current'] })
+		await qc.invalidateQueries({ queryKey: ['work-sessions-my'] })
+	}
+
+	async function runAction(action: () => Promise<void>, fallback: string) {
+		setError(null)
 		setIsSubmitting(true)
 		try {
-			await api.post('/timesheet/', {
-				entry_date: entryDate,
-				hours: Number(hours),
-				project: project.trim() || null,
-				notes: notes.trim() || null
-			})
-			setHours('')
-			setProject('')
-			setNotes('')
-			await qc.invalidateQueries({ queryKey: ['timesheet'] })
+			await action()
+			await refresh()
 		} catch (e) {
-			setFormError(getApiErrorMessage(e, 'Не удалось добавить запись'))
+			setError(getApiErrorMessage(e, fallback))
 		} finally {
 			setIsSubmitting(false)
 		}
 	}
 
-	async function onDelete(entryId: number) {
-		setFormError(null)
-		try {
-			await api.delete(`/timesheet/${entryId}`)
-			await qc.invalidateQueries({ queryKey: ['timesheet'] })
-		} catch (e) {
-			setFormError(getApiErrorMessage(e, 'Не удалось удалить запись'))
-		}
+	async function onStart(e: FormEvent) {
+		e.preventDefault()
+		await runAction(async () => {
+			await api.post('/work-sessions/start', { project })
+			setProject('')
+			setNotes('')
+		}, 'Не удалось начать работу')
+	}
+
+	async function onLunchStart() {
+		await runAction(async () => {
+			await api.post('/work-sessions/lunch/start')
+		}, 'Не удалось поставить паузу')
+	}
+
+	async function onLunchEnd() {
+		await runAction(async () => {
+			await api.post('/work-sessions/lunch/end')
+		}, 'Не удалось продолжить работу')
+	}
+
+	async function onFinish(e: FormEvent) {
+		e.preventDefault()
+		await runAction(async () => {
+			await api.post('/work-sessions/finish', { notes })
+			setNotes('')
+		}, 'Не удалось закончить работу')
 	}
 
 	function onLogout() {
@@ -85,66 +142,80 @@ export default function Timesheet() {
 		navigate('/login')
 	}
 
-	if (isLoading) return <div style={{ padding: 16 }}>Загрузка...</div>
-	if (error) return <div style={{ padding: 16 }}>Ошибка загрузки</div>
+	if (currentQuery.isLoading || historyQuery.isLoading) {
+		return <div style={{ padding: 24 }}>Загрузка...</div>
+	}
 
 	return (
-		<div style={{ padding: 24, maxWidth: 960 }}>
+		<div style={{ padding: 24, maxWidth: 1060 }}>
 			<header style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 24 }}>
 				<div>
-					<h2 style={{ margin: 0 }}>Табель</h2>
-					<div style={{ marginTop: 8, color: '#555' }}>Итого: {totalHours.toFixed(1)} ч.</div>
+					<Link to="/"><button type="button">Домашняя страница</button></Link>
+					<h2 style={{ marginBottom: 4 }}>Рабочий день</h2>
+					<div style={{ color: '#555' }}>Запустите учет времени, поставьте одну паузу на обед и завершите работу в конце дня.</div>
 				</div>
-				<button type="button" onClick={onLogout}>Выйти</button>
+				<button type="button" onClick={onLogout}>Выход</button>
 			</header>
 
-			<form onSubmit={onSubmit} style={{ display: 'grid', gridTemplateColumns: '160px 120px 1fr 1.4fr auto', gap: 12, alignItems: 'end', marginBottom: 12 }}>
-				<label>
-					<div style={{ marginBottom: 4 }}>Дата</div>
-					<input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} required style={{ width: '100%' }} />
-				</label>
-				<label>
-					<div style={{ marginBottom: 4 }}>Часы</div>
-					<input type="number" step="0.1" min="0.1" max="24" value={hours} onChange={(e) => setHours(e.target.value)} required style={{ width: '100%' }} />
-				</label>
-				<label>
-					<div style={{ marginBottom: 4 }}>Проект</div>
-					<input placeholder="Например: Сайт" value={project} onChange={(e) => setProject(e.target.value)} style={{ width: '100%' }} />
-				</label>
-				<label>
-					<div style={{ marginBottom: 4 }}>Заметки</div>
-					<input placeholder="Что было сделано" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%' }} />
-				</label>
-				<button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Добавление...' : 'Добавить'}</button>
-			</form>
+			{error && <div style={{ color: '#b00020', marginBottom: 12 }}>{error}</div>}
 
-			{formError && <div style={{ color: '#b00020', marginBottom: 12 }}>{formError}</div>}
+			{!current ? (
+				<form onSubmit={onStart} style={{ display: 'flex', gap: 12, alignItems: 'end', marginBottom: 24 }}>
+					<label style={{ flex: 1 }}>
+						<div style={{ marginBottom: 4 }}>Проект</div>
+						<input required placeholder="Например: Сайт компании" value={project} onChange={(e) => setProject(e.target.value)} style={{ width: '100%' }} />
+					</label>
+					<button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Запуск...' : 'Начать работу'}</button>
+				</form>
+			) : (
+				<section style={{ border: '1px solid #ddd', padding: 16, marginBottom: 24 }}>
+					<h3 style={{ marginTop: 0 }}>{current.project}</h3>
+					<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
+						<div><strong>Статус</strong><br />{current.status === 'paused' ? 'Обед' : 'В работе'}</div>
+						<div><strong>Начало</strong><br />{formatDateTime(current.started_at)}</div>
+						<div><strong>Обед</strong><br />{current.lunch_started_at ? `${formatDateTime(current.lunch_started_at)} - ${formatDateTime(current.lunch_ended_at)}` : '-'}</div>
+						<div><strong>Время</strong><br />{formatDuration(liveSeconds)}</div>
+					</div>
 
+					<div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+						{!current.lunch_started_at && <button type="button" onClick={onLunchStart} disabled={isSubmitting}>Пауза на обед</button>}
+						{current.lunch_started_at && !current.lunch_ended_at && <button type="button" onClick={onLunchEnd} disabled={isSubmitting}>Продолжить работу</button>}
+					</div>
+
+					<form onSubmit={onFinish} style={{ display: 'flex', gap: 12, alignItems: 'end' }}>
+						<label style={{ flex: 1 }}>
+							<div style={{ marginBottom: 4 }}>Комментарий</div>
+							<input placeholder="Необязательно" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%' }} />
+						</label>
+						<button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Сохранение...' : 'Закончить работу'}</button>
+					</form>
+				</section>
+			)}
+
+			<h3>Мои записи</h3>
 			<table style={{ borderCollapse: 'collapse', width: '100%' }}>
 				<thead>
 					<tr>
 						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Дата</th>
-						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Часы</th>
 						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Проект</th>
-						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Заметки</th>
-						<th style={{ textAlign: 'right', borderBottom: '1px solid #ddd', padding: 8 }}>Действия</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Начало</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Конец</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Итого</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Комментарий</th>
 					</tr>
 				</thead>
 				<tbody>
-					{data?.length === 0 && (
-						<tr>
-							<td colSpan={5} style={{ color: '#666', padding: 12 }}>Записей пока нет</td>
-						</tr>
+					{historyQuery.data?.length === 0 && (
+						<tr><td colSpan={6} style={{ padding: 12, color: '#666' }}>Записей пока нет</td></tr>
 					)}
-					{data?.map((e) => (
-						<tr key={e.id}>
-							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{formatDate(e.entry_date)}</td>
-							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{e.hours.toFixed(1)}</td>
-							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{e.project || '-'}</td>
-							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{e.notes || '-'}</td>
-							<td style={{ borderBottom: '1px solid #eee', padding: 8, textAlign: 'right' }}>
-								<button type="button" onClick={() => onDelete(e.id)}>Удалить</button>
-							</td>
+					{historyQuery.data?.map((session) => (
+						<tr key={session.id}>
+							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{parseApiDate(session.started_at).toLocaleDateString()}</td>
+							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{session.project}</td>
+							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{formatDateTime(session.started_at)}</td>
+							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{formatDateTime(session.ended_at)}</td>
+							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{formatDuration(session.total_seconds)}</td>
+							<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{session.notes || '-'}</td>
 						</tr>
 					))}
 				</tbody>

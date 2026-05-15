@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field
 
@@ -49,3 +49,40 @@ class TimesheetRead(BaseModel):
 
 	class Config:
 		from_attributes = True
+
+
+class AdminLogin(BaseModel):
+	username: str
+	password: str
+
+
+class WorkSessionStart(BaseModel):
+	project: str = Field(min_length=1, max_length=200)
+
+
+class WorkSessionFinish(BaseModel):
+	notes: Optional[str] = None
+
+
+class WorkSessionUpdate(BaseModel):
+	project: Optional[str] = None
+	started_at: Optional[datetime] = None
+	lunch_started_at: Optional[datetime] = None
+	lunch_ended_at: Optional[datetime] = None
+	ended_at: Optional[datetime] = None
+	notes: Optional[str] = None
+
+
+class WorkSessionRead(BaseModel):
+	id: int
+	user_id: int
+	user_name: Optional[str] = None
+	user_email: Optional[EmailStr] = None
+	project: str
+	started_at: datetime
+	lunch_started_at: Optional[datetime] = None
+	lunch_ended_at: Optional[datetime] = None
+	ended_at: Optional[datetime] = None
+	notes: Optional[str] = None
+	status: str
+	total_seconds: int

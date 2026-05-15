@@ -2,9 +2,9 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, getApiErrorMessage } from '../lib/api'
 
-export default function Login() {
+export default function AdminLogin() {
 	const navigate = useNavigate()
-	const [email, setEmail] = useState('')
+	const [username, setUsername] = useState('')
 	const [password, setPassword] = useState('')
 	const [error, setError] = useState<string | null>(null)
 
@@ -12,26 +12,21 @@ export default function Login() {
 		e.preventDefault()
 		setError(null)
 		try {
-			const params = new URLSearchParams()
-			params.set('username', email)
-			params.set('password', password)
-			const res = await api.post('/auth/login', params, {
-				headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-			})
-			localStorage.setItem('token', res.data.access_token)
-			localStorage.removeItem('adminToken')
-			navigate('/work')
+			const res = await api.post('/admin/login', { username, password })
+			localStorage.setItem('adminToken', res.data.access_token)
+			localStorage.removeItem('token')
+			navigate('/admin/dashboard')
 		} catch (e) {
-			setError(getApiErrorMessage(e, 'Ошибка входа'))
+			setError(getApiErrorMessage(e, 'Ошибка входа администратора'))
 		}
 	}
 
 	return (
 		<div style={{ padding: 24, maxWidth: 460 }}>
 			<Link to="/"><button type="button">Домашняя страница</button></Link>
-			<h2>Вход</h2>
+			<h2>Администратор</h2>
 			<form onSubmit={onSubmit}>
-				<input placeholder="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={{ display: 'block', marginBottom: 8, width: '100%' }} />
+				<input placeholder="Имя" required value={username} onChange={(e) => setUsername(e.target.value)} style={{ display: 'block', marginBottom: 8, width: '100%' }} />
 				<input placeholder="Пароль" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ display: 'block', marginBottom: 8, width: '100%' }} />
 				{error && <div style={{ color: 'red', marginBottom: 8 }}>{error}</div>}
 				<button type="submit">Войти</button>
