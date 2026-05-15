@@ -1,15 +1,48 @@
-Запуск frontend (React + Vite)
+# Frontend
 
-1) Требуется Node.js 20+
-2) Установка зависимостей:
+Frontend написан на React + Vite.
+
+## Страницы
+
+- `/` - главная страница.
+- `/register` - регистрация сотрудника.
+- `/login` - вход сотрудника.
+- `/work` - рабочий день сотрудника.
+- `/admin` - вход администратора.
+- `/admin/dashboard` - админ-панель.
+
+## Локальный запуск через Docker
+
+```bash
+docker compose up --build
 ```
+
+Frontend будет доступен на:
+
+```text
+http://127.0.0.1:5173/
+```
+
+## Production-сборка через Docker
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Сайт будет доступен на:
+
+```text
+http://127.0.0.1/
+```
+
+## Локальный запуск без Docker
+
+Требуется Node.js 20+ и npm.
+
+```bash
 cd frontend
 npm i
-```
-3) Запуск dev-сервера:
-```
 npm run dev
 ```
-Приложение будет доступно на http://localhost:5173
 
-API проксируется на http://localhost:8000
+API проксируется на backend.

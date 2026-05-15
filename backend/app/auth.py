@@ -14,7 +14,7 @@ router = APIRouter()
 def register(data: UserCreate, session: Session = Depends(get_session)):
 	existing = session.exec(select(User).where(User.email == data.email)).first()
 	if existing:
-		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Этот email уже зарегистрирован")
 	user = User(email=data.email, hashed_password=hash_password(data.password), full_name=data.full_name)
 	session.add(user)
 	session.commit()
@@ -26,7 +26,7 @@ def register(data: UserCreate, session: Session = Depends(get_session)):
 def login(form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
 	user = session.exec(select(User).where(User.email == form.username)).first()
 	if not user or not verify_password(form.password, user.hashed_password):
-		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect email or password")
+		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Неверный email или пароль")
 	token = create_access_token(subject=user.email)
 	return Token(access_token=token)
 

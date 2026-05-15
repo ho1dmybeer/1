@@ -1,69 +1,111 @@
-# Time Tracker (FastAPI + React)
+# Табель учета рабочего времени
 
-ТЗ: Табель учета рабочего времени с логином/регистрацией, фронт на React, бэкенд на FastAPI, деплой в Docker.
+Веб-приложение для учета рабочего времени сотрудников организации.
 
-## Структура
+Стек:
 
-- backend/ (FastAPI, SQLModel, JWT)
-- frontend/ (React + Vite + React Query)
-- docker-compose.yml (postgres, backend, frontend)
-- docker-compose.prod.yml (production-сборка для сервера)
-- DEPLOY.md (простая инструкция ручного деплоя)
+- Backend: FastAPI, SQLModel, JWT
+- Frontend: React, Vite, React Query
+- База данных: PostgreSQL в Docker
+- Деплой: Docker Compose
 
-## Локальный запуск
+## Что умеет приложение
 
-1) Backend
+- Регистрация сотрудника по имени, email и паролю.
+- Вход сотрудника по email и паролю.
+- Запуск рабочего дня по кнопке `Начать работу`.
+- Одна пауза на обед за рабочую смену.
+- Завершение работы с необязательным комментарием.
+- История смен сотрудника.
+- Отдельный вход администратора.
+- Админ-панель со всеми рабочими сменами.
+- Редактирование строк администратором, включая забытое окончание работы.
+- Удаление ошибочных строк администратором.
 
-```
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r backend/requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --app-dir backend
-```
+## Основные адреса
 
-2) Frontend
+При локальном Docker-запуске:
 
-```
-cd frontend
-npm i
-npm run dev
-```
+- Сайт: <http://127.0.0.1/>
+- Проверка backend: <http://127.0.0.1/health>
 
-## Docker для разработки
+На сервере вместо `127.0.0.1` используется IP сервера или домен.
 
-```
-docker compose up --build
-```
+## Данные администратора
 
-## Простой деплой на сервер
+По умолчанию:
 
-Первый рабочий вариант деплоя описан в `DEPLOY.md`.
+- Имя: `admin`
+- Пароль: `555555`
 
-Коротко:
+На сервере пароль лучше заменить в файле `.env` через переменную `ADMIN_PASSWORD`.
 
-```
+## Документация
+
+- [DOCUMENTATION.md](DOCUMENTATION.md) - инструкция для пользователя, администратора и проверки перед запуском.
+- [DEPLOY.md](DEPLOY.md) - пошаговый деплой на сервер.
+
+## Быстрый запуск через Docker
+
+```bash
 cp .env.example .env
-nano .env
 docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Проверить:
+
+```bash
+curl http://127.0.0.1/health
+```
+
+Открыть сайт:
+
+```text
+http://127.0.0.1/
+```
+
+## Локальная разработка без production-сборки
+
+```bash
+docker compose up --build
 ```
 
 После запуска:
 
-```
-curl http://SERVER_IP/health
+- Frontend: <http://127.0.0.1:5173/>
+- Backend: <http://127.0.0.1:8000/health>
+
+## Обновление с GitHub
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-## Публикация в GitHub
+## Полезные команды
 
-1) Создайте пустой публичный репозиторий на GitHub
+Статус контейнеров:
 
-2) В папке проекта выполните:
-
+```bash
+docker compose -f docker-compose.prod.yml ps
 ```
-git init
-git branch -m main
-git remote add origin https://github.com/<your-username>/<repo>.git
-git add .
-git commit -m "feat: time tracker skeleton"
-git push -u origin main
+
+Логи backend:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f backend
 ```
+
+Логи frontend:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f frontend
+```
+
+Остановить приложение:
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+Обычная команда `down` не удаляет данные PostgreSQL, потому что они лежат в Docker volume `pg_data`.
