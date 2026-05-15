@@ -8,6 +8,7 @@ import AdminLogin from './pages/AdminLogin'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Timesheet from './pages/Timesheet'
+import './styles.css'
 
 const router = createBrowserRouter([
 	{ path: '/', element: <App /> },

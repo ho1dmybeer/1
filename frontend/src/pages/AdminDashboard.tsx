@@ -26,6 +26,11 @@ interface RowState {
 	notes: string
 }
 
+const cellStyle = { borderBottom: '1px solid #eee', padding: 8, verticalAlign: 'top' } as const
+const headCellStyle = { textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8, whiteSpace: 'nowrap' } as const
+const textInputStyle = { width: '100%', minWidth: 0 } as const
+const dateInputStyle = { width: '100%', minWidth: 156 } as const
+
 function parseApiDate(value: string) {
 	return new Date(value.endsWith('Z') ? value : `${value}Z`)
 }
@@ -100,17 +105,17 @@ function EditableRow({ session }: { session: WorkSession }) {
 
 	return (
 		<tr>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{session.user_name || session.user_email || '-'}</td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{parseApiDate(session.started_at).toLocaleDateString()}</td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}><input value={row.project} onChange={(e) => setRow({ ...row, project: e.target.value })} /></td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}><input type="datetime-local" value={row.started_at} onChange={(e) => setRow({ ...row, started_at: e.target.value })} /></td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}><input type="datetime-local" value={row.lunch_started_at} onChange={(e) => setRow({ ...row, lunch_started_at: e.target.value })} /></td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}><input type="datetime-local" value={row.lunch_ended_at} onChange={(e) => setRow({ ...row, lunch_ended_at: e.target.value })} /></td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}><input type="datetime-local" value={row.ended_at} onChange={(e) => setRow({ ...row, ended_at: e.target.value })} /></td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{formatDuration(session.total_seconds)}</td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}><input value={row.notes} onChange={(e) => setRow({ ...row, notes: e.target.value })} /></td>
-			<td style={{ borderBottom: '1px solid #eee', padding: 8 }}>
-				<form onSubmit={onSave} style={{ display: 'flex', gap: 6 }}>
+			<td style={cellStyle}>{session.user_name || session.user_email || '-'}</td>
+			<td style={cellStyle}>{parseApiDate(session.started_at).toLocaleDateString()}</td>
+			<td style={cellStyle}><input value={row.project} onChange={(e) => setRow({ ...row, project: e.target.value })} style={textInputStyle} /></td>
+			<td style={cellStyle}><input type="datetime-local" value={row.started_at} onChange={(e) => setRow({ ...row, started_at: e.target.value })} style={dateInputStyle} /></td>
+			<td style={cellStyle}><input type="datetime-local" value={row.lunch_started_at} onChange={(e) => setRow({ ...row, lunch_started_at: e.target.value })} style={dateInputStyle} /></td>
+			<td style={cellStyle}><input type="datetime-local" value={row.lunch_ended_at} onChange={(e) => setRow({ ...row, lunch_ended_at: e.target.value })} style={dateInputStyle} /></td>
+			<td style={cellStyle}><input type="datetime-local" value={row.ended_at} onChange={(e) => setRow({ ...row, ended_at: e.target.value })} style={dateInputStyle} /></td>
+			<td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>{formatDuration(session.total_seconds)}</td>
+			<td style={cellStyle}><input value={row.notes} onChange={(e) => setRow({ ...row, notes: e.target.value })} style={textInputStyle} /></td>
+			<td style={cellStyle}>
+				<form onSubmit={onSave} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
 					<button type="submit">Сохранить</button>
 					<button type="button" onClick={onDelete}>Удалить</button>
 				</form>
@@ -146,9 +151,9 @@ export default function AdminDashboard() {
 	}
 
 	return (
-		<div style={{ padding: 24, maxWidth: 1280 }}>
-			<header style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 24 }}>
-				<div>
+		<div style={{ padding: 24, width: '100%', maxWidth: '100%' }}>
+			<header style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
+				<div style={{ minWidth: 0 }}>
 					<Link to="/"><button type="button">Домашняя страница</button></Link>
 					<h2>Администратор табеля</h2>
 					<div style={{ color: '#555' }}>Здесь можно поставить забытое окончание работы, изменить проект или удалить ошибочную строку.</div>
@@ -159,26 +164,40 @@ export default function AdminDashboard() {
 			{query.isLoading ? (
 				<div>Загрузка...</div>
 			) : (
-				<table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 14 }}>
-					<thead>
-						<tr>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Имя</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Дата</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Проект</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Начало</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Обед начало</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Обед конец</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Окончание</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Итого</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Комментарий</th>
-							<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Действия</th>
-						</tr>
-					</thead>
-					<tbody>
-						{query.data?.length === 0 && <tr><td colSpan={10} style={{ padding: 12, color: '#666' }}>Записей пока нет</td></tr>}
-						{query.data?.map((session) => <EditableRow key={session.id} session={session} />)}
-					</tbody>
-				</table>
+				<div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
+					<table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1120, fontSize: 14 }}>
+						<colgroup>
+							<col style={{ width: 150 }} />
+							<col style={{ width: 100 }} />
+							<col style={{ width: 150 }} />
+							<col style={{ width: 175 }} />
+							<col style={{ width: 175 }} />
+							<col style={{ width: 175 }} />
+							<col style={{ width: 175 }} />
+							<col style={{ width: 90 }} />
+							<col style={{ width: 160 }} />
+							<col style={{ width: 150 }} />
+						</colgroup>
+						<thead>
+							<tr>
+								<th style={headCellStyle}>Имя</th>
+								<th style={headCellStyle}>Дата</th>
+								<th style={headCellStyle}>Проект</th>
+								<th style={headCellStyle}>Начало</th>
+								<th style={headCellStyle}>Обед начало</th>
+								<th style={headCellStyle}>Обед конец</th>
+								<th style={headCellStyle}>Окончание</th>
+								<th style={headCellStyle}>Итого</th>
+								<th style={headCellStyle}>Комментарий</th>
+								<th style={headCellStyle}>Действия</th>
+							</tr>
+						</thead>
+						<tbody>
+							{query.data?.length === 0 && <tr><td colSpan={10} style={{ padding: 12, color: '#666' }}>Записей пока нет</td></tr>}
+							{query.data?.map((session) => <EditableRow key={session.id} session={session} />)}
+						</tbody>
+					</table>
+				</div>
 			)}
 		</div>
 	)
