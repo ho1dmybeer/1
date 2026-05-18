@@ -1,4 +1,6 @@
 node_modules/
+dist/
+build/
 .dist/
 .build/
 .DS_Store
@@ -9,5 +11,7 @@ node_modules/
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
 .idea/
 .vscode/
